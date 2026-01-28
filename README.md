@@ -1,10 +1,10 @@
 # SignSpeak Mobile App
 
-Aplicación móvil para traducción en tiempo real de Lenguaje de Señas Mexicano (LSM) utilizando visión por computadora.
+Aplicación móvil para traducción en tiempo real de Lenguaje de Señas Mexicano (LSM).
 
 ## Descripción
 
-SignSpeak Frontend es una aplicación React Native que detecta gestos de manos en tiempo real mediante MediaPipe y los traduce a letras, palabras y frases usando modelos de machine learning hospedados en el backend.
+SignSpeak es una aplicación React Native que detecta gestos de manos en tiempo real usando la cámara del dispositivo. Mediante MediaPipe, extrae landmarks de las manos y los envía al backend, donde modelos de machine learning los traducen a letras, palabras y frases del Lenguaje de Señas Mexicano.
 
 ## Stack Tecnológico
 
