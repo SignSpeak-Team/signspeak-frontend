@@ -5,6 +5,7 @@ node_modules/
 
 # documentation (local only)
 docs/
+STRUCTURE_SUMMARY.md
 
 # Expo
 .expo/
