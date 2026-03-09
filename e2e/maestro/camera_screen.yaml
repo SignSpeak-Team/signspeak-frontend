@@ -1,0 +1,33 @@
+# ============================================================
+# Maestro E2E Flow – Pantalla Principal (Camera)
+# ============================================================
+# PREREQUISITOS:
+#   - Java 17+ instalado y en PATH
+#   - Android emulador corriendo (o dispositivo físico conectado)
+#   - Expo Go instalado en el emulador
+#   - App corriendo: npm start
+#
+# EJECUTAR:
+#   maestro test e2e/maestro/camera_screen.yaml
+# ============================================================
+
+appId: host.exp.Exponent # Package de Expo Go en Android
+---
+# 1. Abrir la app vía deeplink en Expo Go
+- openLink: "exp://127.0.0.1:8081"
+
+# 2. Esperar a que cargue la pantalla de cámara
+- waitForAnimationToEnd
+
+# 3. Verificar que el texto de instrucciones está visible
+- assertVisible: "Position your hand in the frame and tap to capture"
+
+# 4. Verificar que el botón de flash existe (icono flash-off por defecto)
+# Maestro busca por content description / accessibility label
+- assertVisible:
+    id: "flash-toggle-btn"
+    optional: true # Si el ícono no tiene testID, usar assertVisible con texto
+
+# 5. La pantalla de cámara debe estar activa (no en otro tab)
+- assertNotVisible: "Translation History"
+- assertNotVisible: "Settings"

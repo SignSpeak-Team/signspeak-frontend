@@ -1,0 +1,45 @@
+# ============================================================
+# Maestro E2E Flow – Settings (Guardar Configuración)
+# ============================================================
+# EJECUTAR:
+#   maestro test e2e/maestro/settings_flow.yaml
+# ============================================================
+
+appId: host.exp.Exponent
+---
+# 1. Abrir la app
+- openLink: "exp://127.0.0.1:8081"
+- waitForAnimationToEnd
+
+# 2. Navegar al tab de Settings
+- tapOn: "Settings"
+
+# 3. Verificar que el título está visible
+- assertVisible: "Settings"
+
+# 4. Verificar la sección de API Configuration
+- assertVisible: "API Configuration"
+- assertVisible: "Backend API Endpoint"
+
+# 5. Verificar la sección de Camera Settings
+- assertVisible: "Camera Settings"
+- assertVisible: "Flash by Default"
+
+# 6. Verificar la sección de Language
+- assertVisible: "Language"
+
+# 7. Hacer scroll hacia abajo para ver el botón de guardar
+- scroll
+
+# 8. Verificar que el botón Save Settings existe
+- assertVisible: "💾 Save Settings"
+
+# 9. Verificar que el botón de limpiar historial existe
+- assertVisible: "🗑️ Clear History"
+
+# 10. Pulsar Save Settings y verificar el mensaje de éxito
+- tapOn: "💾 Save Settings"
+- assertVisible: "Settings saved successfully!"
+
+# 11. Cerrar el alert
+- tapOn: "OK"

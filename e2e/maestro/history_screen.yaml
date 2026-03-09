@@ -1,0 +1,35 @@
+# ============================================================
+# Maestro E2E Flow – Historial de Traducciones
+# ============================================================
+# EJECUTAR:
+#   maestro test e2e/maestro/history_screen.yaml
+# ============================================================
+
+appId: host.exp.Exponent
+---
+# 1. Abrir la app
+- openLink: "exp://127.0.0.1:8081"
+- waitForAnimationToEnd
+
+# 2. Navegar al tab de Historial (Explore)
+- tapOn: "Explore"
+
+# 3. Verificar estado vacío o con datos
+# Si no hay traducciones previas debe mostrar el mensaje de vacío:
+- assertVisible:
+    text: "No History Yet"
+    optional: true
+
+# 4. Si hay historial, verificar que el título está presente
+- assertVisible:
+    text: "Translation History"
+    optional: true
+
+# 5. Verificar que el campo de búsqueda está disponible
+- assertVisible:
+    text: "Search translations..."
+    optional: true
+
+# 6. Volver a la tab de cámara
+- tapOn: "Camera"
+- assertVisible: "Position your hand in the frame and tap to capture"

@@ -1,112 +1,239 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import ErrorMessage from "@/components/error-message";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import TranslationCard from "@/components/translation-card";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { StorageService } from "@/services/storage-service";
+import { Translation } from "@/types/types";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+export default function HistoryScreen() {
+  const [history, setHistory] = useState<Translation[]>([]);
+  const [filteredHistory, setFilteredHistory] = useState<Translation[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
-export default function TabTwoScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  useEffect(() => {
+    // Filter history based on search query
+    if (searchQuery.trim() === "") {
+      setFilteredHistory(history);
+    } else {
+      const filtered = history.filter((item) =>
+        item.text.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+      setFilteredHistory(filtered);
+    }
+  }, [searchQuery, history]);
+
+  const loadHistory = async () => {
+    try {
+      const data = await StorageService.getHistory();
+      setHistory(data);
+      setFilteredHistory(data);
+    } catch (error) {
+      console.error("Error loading history:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    Alert.alert(
+      "Delete Translation",
+      "Are you sure you want to delete this translation?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await StorageService.deleteTranslation(id);
+              await loadHistory();
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete translation");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleClearAll = () => {
+    Alert.alert(
+      "Clear All History",
+      "Are you sure you want to delete all translation history? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await StorageService.clearHistory();
+              await loadHistory();
+            } catch (error) {
+              Alert.alert("Error", "Failed to clear history");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <ThemedView style={styles.centered}>
+        <ThemedText>Loading history...</ThemedText>
       </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <ErrorMessage
+        title="No History Yet"
+        message="Your translation history will appear here. Start by capturing a sign on the Camera tab!"
+        type="general"
+      />
+    );
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      {/* Header with search and clear */}
+      <View style={styles.header}>
+        <ThemedText type="title" style={styles.title}>
+          Translation History
         </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
+
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: isDark ? "#1c1c1e" : "#f5f5f5" },
+          ]}
+        >
+          <Ionicons
+            name="search"
+            size={20}
+            color={isDark ? "#8e8e93" : "#8e8e93"}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: isDark ? "#fff" : "#000" }]}
+            placeholder="Search translations..."
+            placeholderTextColor={isDark ? "#8e8e93" : "#8e8e93"}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery("")}>
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={isDark ? "#8e8e93" : "#8e8e93"}
+              />
+            </Pressable>
+          )}
+        </View>
+
+        {history.length > 0 && (
+          <Pressable style={styles.clearButton} onPress={handleClearAll}>
+            <Ionicons name="trash-outline" size={20} color="#F44336" />
+            <ThemedText style={styles.clearButtonText}>Clear All</ThemedText>
+          </Pressable>
+        )}
+      </View>
+
+      {/* History list */}
+      {filteredHistory.length === 0 ? (
+        <View style={styles.centered}>
+          <ThemedText>No results found for "{searchQuery}"</ThemedText>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredHistory}
+          renderItem={({ item }) => (
+            <View>
+              <TranslationCard translation={item} />
+              <Pressable
+                style={styles.deleteButton}
+                onPress={() => handleDelete(item.id)}
+              >
+                <Ionicons name="trash-outline" size={20} color="#F44336" />
+              </Pressable>
+            </View>
+          )}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
         />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+      )}
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
   },
-  titleContainer: {
-    flexDirection: 'row',
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  header: {
+    padding: 16,
+    paddingTop: 60,
+    gap: 12,
+  },
+  title: {
+    marginBottom: 8,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  clearButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+  },
+  clearButtonText: {
+    color: "#F44336",
+    fontWeight: "600",
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 16,
+    right: 24,
+    backgroundColor: "rgba(244, 67, 54, 0.1)",
+    padding: 10,
+    borderRadius: 20,
   },
 });

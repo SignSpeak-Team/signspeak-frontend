@@ -1,98 +1,174 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import CameraViewComponent, {
+  CameraViewHandle,
+} from "@/components/camera-view";
+import ProcessingOverlay from "@/components/processing-overlay";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import CaptureButton from "@/components/ui/capture-button";
+import { StorageService } from "@/services/storage-service";
+import { TranslationService } from "@/services/translation-service";
+import { Translation } from "@/types/types";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useRef, useState } from "react";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function CameraScreen() {
+  const router = useRouter();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [cameraType, setCameraType] = useState<"front" | "back">("back");
+  const cameraRef = useRef<CameraViewHandle>(null);
 
-export default function HomeScreen() {
+  const handleCapture = async (imageUri: string) => {
+    setIsProcessing(true);
+
+    try {
+      console.log("📸 Image captured:", imageUri);
+
+      // Call translation service
+      const result = await TranslationService.translateSign(imageUri);
+
+      if (result.success && result.data) {
+        // Create translation object
+        const translation: Translation = {
+          id: Date.now().toString(),
+          imageUri,
+          text: result.data.text,
+          signType: result.data.signType,
+          confidence: result.data.confidence,
+          timestamp: Date.now(),
+        };
+
+        // Save to history
+        await StorageService.saveTranslation(translation);
+        console.log("✅ Translation saved to history");
+
+        // Navigate to results screen
+        router.push({
+          pathname: "/translation-result" as any,
+          params: {
+            translationId: translation.id,
+            imageUri: translation.imageUri,
+            text: translation.text,
+            signType: translation.signType,
+            confidence: translation.confidence.toString(),
+          },
+        });
+      } else {
+        Alert.alert(
+          "Translation Failed",
+          result.error || "Unable to translate sign. Please try again.",
+        );
+      }
+    } catch (error) {
+      console.error("Error processing translation:", error);
+      Alert.alert(
+        "Error",
+        "An error occurred while processing the image. Please try again.",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const toggleFlash = () => {
+    setFlashEnabled(!flashEnabled);
+  };
+
+  const toggleCamera = () => {
+    setCameraType(cameraType === "back" ? "front" : "back");
+  };
+
+  const handleCapturePress = () => {
+    if (cameraRef.current) {
+      cameraRef.current.capture();
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ThemedView style={styles.container}>
+      {isProcessing && (
+        <ProcessingOverlay message="Detecting hand and translating..." />
+      )}
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <CameraViewComponent
+        ref={cameraRef}
+        onCapture={handleCapture}
+        cameraType={cameraType}
+        flashEnabled={flashEnabled}
+      />
+
+      {/* Controls overlay */}
+      <View style={styles.controlsContainer}>
+        {/* Top controls */}
+        <View style={styles.topControls}>
+          <Pressable style={styles.iconButton} onPress={toggleFlash}>
+            <Ionicons
+              name={flashEnabled ? "flash" : "flash-off"}
+              size={28}
+              color="#fff"
+            />
+          </Pressable>
+          <Pressable style={styles.iconButton} onPress={toggleCamera}>
+            <Ionicons name="camera-reverse" size={28} color="#fff" />
+          </Pressable>
+        </View>
+
+        {/* Bottom controls */}
+        <View style={styles.bottomControls}>
+          <View style={styles.captureButtonContainer}>
+            <CaptureButton
+              onPress={handleCapturePress}
+              isProcessing={isProcessing}
+            />
+          </View>
+          <ThemedText style={styles.instructions}>
+            Position your hand in the frame and tap to capture
+          </ThemedText>
+        </View>
+      </View>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  controlsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  topControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 20,
+    paddingTop: 60,
+  },
+  bottomControls: {
+    alignItems: "center",
+    paddingBottom: 40,
+    gap: 16,
+  },
+  iconButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  captureButtonContainer: {
+    alignItems: "center",
+  },
+  instructions: {
+    color: "#fff",
+    fontSize: 14,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
