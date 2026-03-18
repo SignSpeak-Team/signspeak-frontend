@@ -9,7 +9,7 @@ import { StorageService } from "@/services/storage-service";
 import { TranslationService } from "@/services/translation-service";
 import { type Translation } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
-import { Href, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 
@@ -24,8 +24,6 @@ export default function CameraScreen() {
     setIsProcessing(true);
 
     try {
-      console.log("📸 Image captured:", imageUri);
-
       // Call translation service
       const result = await TranslationService.translateSign(imageUri);
 
@@ -42,11 +40,10 @@ export default function CameraScreen() {
 
         // Save to history
         await StorageService.saveTranslation(translation);
-        console.log("✅ Translation saved to history");
 
         // Navigate to results screen
         router.push({
-          pathname: "/translation-result" as any,
+          pathname: "/translation-result",
           params: {
             translationId: translation.id,
             imageUri: translation.imageUri,

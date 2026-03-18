@@ -115,7 +115,6 @@ export default function TranslationResultScreen() {
               ]}
               onPress={() => {
                 // TODO: Implement share functionality
-                console.log("Share translation");
               }}
             >
               <Ionicons
