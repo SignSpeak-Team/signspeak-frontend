@@ -1,5 +1,5 @@
 import CameraViewComponent, {
-  CameraViewHandle,
+  type CameraViewHandle,
 } from "@/components/camera-view";
 import ProcessingOverlay from "@/components/processing-overlay";
 import { ThemedText } from "@/components/themed-text";
@@ -7,9 +7,9 @@ import { ThemedView } from "@/components/themed-view";
 import CaptureButton from "@/components/ui/capture-button";
 import { StorageService } from "@/services/storage-service";
 import { TranslationService } from "@/services/translation-service";
-import { Translation } from "@/types/types";
+import { type Translation } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { Href, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 

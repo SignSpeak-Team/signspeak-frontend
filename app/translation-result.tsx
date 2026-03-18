@@ -23,8 +23,8 @@ export default function TranslationResultScreen() {
   const confidenceNum = parseFloat(confidence);
 
   const getConfidenceColor = (conf: number) => {
-    if (conf >= 0.9) return "#4CAF50";
-    if (conf >= 0.7) return "#FF9800";
+    if (conf >= 0.9) {return "#4CAF50";}
+    if (conf >= 0.7) {return "#FF9800";}
     return "#F44336";
   };
 

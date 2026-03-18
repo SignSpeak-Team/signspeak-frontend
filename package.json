@@ -10,9 +10,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "test:unit": "jest --testPathPattern=tests/(api|landmark|storage)",
-    "test:integration": "jest --testPathPattern=tests/integration",
-    "test:e2e": "jest --testPathPattern=navigation.e2e",
+    "test:unit": "jest tests/api-config.test.ts tests/landmark-service.test.ts tests/storage-service.test.ts",
+    "test:int": "jest --testPathPattern=\"tests/integration/\"",
+    "test:e2e": "jest tests/navigation.e2e.test.tsx",
     "test:all": "jest",
     "maestro:camera": "maestro test e2e/maestro/camera_screen.yaml",
     "maestro:history": "maestro test e2e/maestro/history_screen.yaml",
@@ -77,7 +77,10 @@
       "@testing-library/jest-native/extend-expect"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|msw)"
-    ]
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|msw|@mswjs/.*))"
+    ],
+    "moduleNameMapper": {
+      "@react-native-async-storage/async-storage": "@react-native-async-storage/async-storage/jest/async-storage-mock"
+    }
   }
 }

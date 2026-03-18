@@ -4,7 +4,7 @@ import { ThemedView } from "@/components/themed-view";
 import TranslationCard from "@/components/translation-card";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { StorageService } from "@/services/storage-service";
-import { Translation } from "@/types/types";
+import { type Translation } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -65,7 +65,7 @@ export default function HistoryScreen() {
             try {
               await StorageService.deleteTranslation(id);
               await loadHistory();
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to delete translation");
             }
           },
@@ -87,7 +87,7 @@ export default function HistoryScreen() {
             try {
               await StorageService.clearHistory();
               await loadHistory();
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to clear history");
             }
           },
@@ -162,7 +162,7 @@ export default function HistoryScreen() {
       {/* History list */}
       {filteredHistory.length === 0 ? (
         <View style={styles.centered}>
-          <ThemedText>No results found for "{searchQuery}"</ThemedText>
+          <ThemedText>No results found for &quot;{searchQuery}&quot;</ThemedText>
         </View>
       ) : (
         <FlatList
