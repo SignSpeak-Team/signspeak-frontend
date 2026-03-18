@@ -191,6 +191,8 @@ El proyecto usa **Jest + jest-expo** para tests unitarios y de integración, y *
 
 ```bash
 npm run test:unit
+
+
 ```
 
 Cubre: `api-config`, `landmark-service`, `storage-service`.
@@ -198,7 +200,9 @@ Cubre: `api-config`, `landmark-service`, `storage-service`.
 ### Tests de integración (front ↔ backend)
 
 ```bash
-npm run test:integration
+npm run test:int
+
+
 ```
 
 Usa **MSW (Mock Service Worker)** para interceptar `fetch` y simular las respuestas del backend sin necesitar que esté corriendo.
