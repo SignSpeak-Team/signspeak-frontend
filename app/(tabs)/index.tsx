@@ -1,5 +1,5 @@
 import CameraViewComponent, {
-  CameraViewHandle,
+  type CameraViewHandle,
 } from "@/components/camera-view";
 import ProcessingOverlay from "@/components/processing-overlay";
 import { ThemedText } from "@/components/themed-text";
@@ -7,7 +7,7 @@ import { ThemedView } from "@/components/themed-view";
 import CaptureButton from "@/components/ui/capture-button";
 import { StorageService } from "@/services/storage-service";
 import { TranslationService } from "@/services/translation-service";
-import { Translation } from "@/types/types";
+import { type Translation } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -24,8 +24,6 @@ export default function CameraScreen() {
     setIsProcessing(true);
 
     try {
-      console.log("📸 Image captured:", imageUri);
-
       // Call translation service
       const result = await TranslationService.translateSign(imageUri);
 
@@ -42,11 +40,10 @@ export default function CameraScreen() {
 
         // Save to history
         await StorageService.saveTranslation(translation);
-        console.log("✅ Translation saved to history");
 
         // Navigate to results screen
         router.push({
-          pathname: "/translation-result" as any,
+          pathname: "/translation-result",
           params: {
             translationId: translation.id,
             imageUri: translation.imageUri,

@@ -5,114 +5,128 @@
  * Verifican que los request/response que el frontend genera
  * cumplen exactamente el contrato esperado por el backend.
  *
- * Si estos tests fallan → hay una divergencia de contrato entre
+ * Si estos tests fallan → hay una divergencia entre
  * frontend (TypeScript) y backend (Python/FastAPI).
+ *
+ * Usa jest.spyOn(global, 'fetch') para interceptar peticiones.
  */
 
-import "whatwg-fetch";
-import { http, HttpResponse } from "msw";
 import {
   API_BASE_URL,
-  API_ENDPOINTS,
   API_CONFIG,
+  API_ENDPOINTS,
   getApiUrl,
 } from "../../services/api-config";
-import { server } from "./mocks/server";
-import { VALID_LANDMARKS } from "./mocks/handlers";
+import { TranslationService } from "../../services/translation-service";
 import type {
   LetterPredictionResponse,
   StaticPredictionRequest,
+  HandLandmarks,
 } from "../../types/types";
 
-beforeAll(() => server.listen({ onUnhandledRequest: "warn" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+// ── Landmarks válidos (21 puntos [x, y, z]) ─────────────────────────────────
 
-// ── Contrato: POST /api/v1/predict/static ─────────────────────────────────────
+const VALID_LANDMARKS: HandLandmarks = Array.from({ length: 21 }, (_, i) => [
+  i * 0.05,
+  i * 0.05,
+  0,
+]);
+
+// ── Helper: crear un Response mock ──────────────────────────────────────────
+
+function mockResponse(body: unknown, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? "OK" : "Error",
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  } as unknown as Response;
+}
+
+// ── Ciclo de vida del spy ────────────────────────────────────────────────────
+
+let fetchSpy: jest.SpyInstance;
+
+beforeEach(() => {
+  fetchSpy = jest.spyOn(global, "fetch");
+});
+
+afterEach(() => {
+  fetchSpy.mockRestore();
+});
+
+// ── Contrato: POST /api/v1/predict/static ────────────────────────────────────
 
 describe("Contrato API: POST /api/v1/predict/static", () => {
-  it("el frontend envía el Content-Type correcto", async () => {
-    let capturedContentType = "";
+  const successResponse: LetterPredictionResponse = {
+    letter: "B",
+    confidence: 88,
+    type: "static",
+  };
 
-    server.use(
-      http.post(getApiUrl(API_ENDPOINTS.PREDICT_STATIC), ({ request }) => {
-        capturedContentType = request.headers.get("content-type") ?? "";
-        return HttpResponse.json<LetterPredictionResponse>({
-          letter: "B",
-          confidence: 88,
-          type: "static",
-        });
-      }),
-    );
+  it("el frontend envía el Content-Type correcto (application/json)", async () => {
+    fetchSpy.mockResolvedValueOnce(mockResponse(successResponse));
 
-    await fetch(getApiUrl(API_ENDPOINTS.PREDICT_STATIC), {
-      method: "POST",
-      headers: API_CONFIG.headers,
-      body: JSON.stringify({ landmarks: VALID_LANDMARKS }),
+    await TranslationService.predictStatic(VALID_LANDMARKS);
+
+    const [, opts] = fetchSpy.mock.calls[0];
+    expect((opts as RequestInit).headers).toMatchObject({
+      "Content-Type": "application/json",
     });
-
-    expect(capturedContentType).toContain("application/json");
   });
 
   it("el frontend envía un body con la forma { landmarks: number[][] }", async () => {
-    let capturedBody: StaticPredictionRequest | null = null;
+    fetchSpy.mockResolvedValueOnce(mockResponse(successResponse));
 
-    server.use(
-      http.post(
-        getApiUrl(API_ENDPOINTS.PREDICT_STATIC),
-        async ({ request }) => {
-          capturedBody = (await request.json()) as StaticPredictionRequest;
-          return HttpResponse.json<LetterPredictionResponse>({
-            letter: "C",
-            confidence: 91,
-            type: "static",
-          });
-        },
-      ),
+    await TranslationService.predictStatic(VALID_LANDMARKS);
+
+    const [, opts] = fetchSpy.mock.calls[0];
+    const body: StaticPredictionRequest = JSON.parse(
+      (opts as RequestInit).body as string
     );
 
-    await fetch(getApiUrl(API_ENDPOINTS.PREDICT_STATIC), {
-      method: "POST",
-      headers: API_CONFIG.headers,
-      body: JSON.stringify({ landmarks: VALID_LANDMARKS }),
-    });
-
-    expect(capturedBody).not.toBeNull();
-    expect(Array.isArray(capturedBody!.landmarks)).toBe(true);
-    expect(capturedBody!.landmarks).toHaveLength(21);
-    expect(capturedBody!.landmarks[0]).toHaveLength(3); // [x, y, z]
+    expect(Array.isArray(body.landmarks)).toBe(true);
+    expect(body.landmarks).toHaveLength(21);
+    expect(body.landmarks[0]).toHaveLength(3); // [x, y, z]
   });
 
   it("el frontend puede parsear correctamente la respuesta del backend", async () => {
-    const mockResponse: LetterPredictionResponse = {
+    const fullResponse: LetterPredictionResponse = {
       letter: "D",
       confidence: 95.2,
       type: "static",
       processing_time_ms: 12,
     };
+    fetchSpy.mockResolvedValueOnce(mockResponse(fullResponse));
 
-    server.use(
-      http.post(getApiUrl(API_ENDPOINTS.PREDICT_STATIC), () =>
-        HttpResponse.json(mockResponse),
-      ),
-    );
+    const data = await TranslationService.predictStatic(VALID_LANDMARKS);
 
-    const res = await fetch(getApiUrl(API_ENDPOINTS.PREDICT_STATIC), {
-      method: "POST",
-      headers: API_CONFIG.headers,
-      body: JSON.stringify({ landmarks: VALID_LANDMARKS }),
-    });
+    expect(typeof data!.letter).toBe("string");
+    expect(typeof data!.confidence).toBe("number");
+    expect(["static", "dynamic"]).toContain(data!.type);
+  });
 
-    const data: LetterPredictionResponse = await res.json();
+  it("el método HTTP usado es POST", async () => {
+    fetchSpy.mockResolvedValueOnce(mockResponse(successResponse));
 
-    // Verifica que los campos requeridos por el frontend existen
-    expect(typeof data.letter).toBe("string");
-    expect(typeof data.confidence).toBe("number");
-    expect(["static", "dynamic"]).toContain(data.type);
+    await TranslationService.predictStatic(VALID_LANDMARKS);
+
+    const [, opts] = fetchSpy.mock.calls[0];
+    expect((opts as RequestInit).method).toBe("POST");
+  });
+
+  it("la URL usada apunta al endpoint correcto", async () => {
+    fetchSpy.mockResolvedValueOnce(mockResponse(successResponse));
+
+    await TranslationService.predictStatic(VALID_LANDMARKS);
+
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toBe(getApiUrl(API_ENDPOINTS.PREDICT_STATIC));
   });
 });
 
-// ── Contrato: GET /api/v1/health ──────────────────────────────────────────────
+// ── Contrato: GET /api/v1/health ─────────────────────────────────────────────
 
 describe("Contrato API: GET /api/v1/health", () => {
   it("la URL construida por el frontend es la correcta", () => {
@@ -121,30 +135,21 @@ describe("Contrato API: GET /api/v1/health", () => {
   });
 
   it("el frontend acepta cualquier respuesta 2xx como 'sano'", async () => {
-    server.use(
-      http.get(getApiUrl(API_ENDPOINTS.HEALTH), () =>
-        HttpResponse.json({ status: "ok" }, { status: 200 }),
-      ),
-    );
+    fetchSpy.mockResolvedValueOnce(mockResponse({ status: "ok" }, 200));
 
-    const res = await fetch(getApiUrl(API_ENDPOINTS.HEALTH));
-    expect(res.ok).toBe(true);
+    const result = await TranslationService.checkHealth();
+    expect(result).toBe(true);
   });
 
   it("el frontend detecta correctamente una respuesta 503 como 'caído'", async () => {
-    server.use(
-      http.get(getApiUrl(API_ENDPOINTS.HEALTH), () =>
-        HttpResponse.json({ status: "error" }, { status: 503 }),
-      ),
-    );
+    fetchSpy.mockResolvedValueOnce(mockResponse({ status: "error" }, 503));
 
-    const res = await fetch(getApiUrl(API_ENDPOINTS.HEALTH));
-    expect(res.ok).toBe(false);
-    expect(res.status).toBe(503);
+    const result = await TranslationService.checkHealth();
+    expect(result).toBe(false);
   });
 });
 
-// ── Contrato: configuración global de la API ──────────────────────────────────
+// ── Contrato: configuración global de la API ─────────────────────────────────
 
 describe("Contrato API: configuración (API_CONFIG)", () => {
   it("el timeout configurado es de 30 segundos (30000 ms)", () => {

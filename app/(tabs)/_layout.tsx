@@ -6,6 +6,18 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
+function CameraTabIcon({ color }: { color: string }) {
+  return <IconSymbol size={28} name="camera.fill" color={color} />;
+}
+
+function HistoryTabIcon({ color }: { color: string }) {
+  return <IconSymbol size={28} name="clock.fill" color={color} />;
+}
+
+function SettingsTabIcon({ color }: { color: string }) {
+  return <IconSymbol size={28} name="gear" color={color} />;
+}
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
@@ -21,27 +33,21 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Camera",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="camera.fill" color={color} />
-          ),
+          tabBarIcon: CameraTabIcon,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: "History",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="clock.fill" color={color} />
-          ),
+          tabBarIcon: HistoryTabIcon,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="gear" color={color} />
-          ),
+          tabBarIcon: SettingsTabIcon,
         }}
       />
     </Tabs>

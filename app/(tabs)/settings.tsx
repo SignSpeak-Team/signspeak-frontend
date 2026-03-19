@@ -2,7 +2,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { StorageService } from "@/services/storage-service";
-import { AppSettings } from "@/types/types";
+import { type AppSettings } from "@/types/types";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -58,7 +58,7 @@ export default function SettingsScreen() {
     try {
       await StorageService.saveSettings(settings);
       Alert.alert("Success", "Settings saved successfully!");
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to save settings");
     }
   };
@@ -76,7 +76,7 @@ export default function SettingsScreen() {
             try {
               await StorageService.clearHistory();
               Alert.alert("Success", "History cleared successfully");
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to clear history");
             }
           },

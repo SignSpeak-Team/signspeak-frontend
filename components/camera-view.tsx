@@ -1,4 +1,4 @@
-import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
+import { type CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { ThemedText } from "./themed-text";

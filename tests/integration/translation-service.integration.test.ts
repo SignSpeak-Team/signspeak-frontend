@@ -4,34 +4,29 @@
  * Pruebas de integración: TranslationService (frontend) ↔ Backend API
  *
  * Qué se prueba:
- *  - checkHealth()        → GET /api/v1/health
- *  - predictStatic()     → POST /api/v1/predict/static
- *  - translateSign()     → flujo completo (landmarks → backend → APIResponse)
- *  - Manejo de errores   → 503, 500, red caída
+ *  - checkHealth()    → GET /api/v1/health
+ *  - predictStatic()  → POST /api/v1/predict/static
+ *  - translateSign()  → flujo completo (landmarks → backend → APIResponse)
+ *  - Manejo de errores → 503, 500, red caída
+ *
+ * Usa jest.spyOn(global, 'fetch') en lugar de MSW para compatibilidad
+ * con jest-expo (CJS / sin soporte ESM nativo).
  */
 
-import "whatwg-fetch"; // polyfill fetch para Jest/Node
 import { TranslationService } from "../../services/translation-service";
 import { LandmarkService } from "../../services/landmark-service";
-import {
-  handlerHealthDown,
-  handlerInternalServerError,
-  handlerNetworkError,
-  handlerServiceUnavailable,
-  VALID_LANDMARKS,
-} from "./mocks/handlers";
-import { server } from "./mocks/server";
-import type { HandLandmarks } from "../../types/types";
+import type { HandLandmarks, LetterPredictionResponse } from "../../types/types";
+import { API_ENDPOINTS, getApiUrl } from "../../services/api-config";
 
-// ── Ciclo de vida del servidor MSW ────────────────────────────────────────────
+// ── Landmarks válidos (21 puntos [x, y, z]) ─────────────────────────────────
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+const VALID_LANDMARKS: HandLandmarks = Array.from({ length: 21 }, (_, i) => [
+  i * 0.05,
+  i * 0.05,
+  0,
+]);
 
-// ── Mock de LandmarkService.extractLandmarks ──────────────────────────────────
-// En integración no procesamos imágenes reales: mockeamos sólo la capa
-// de MediaPipe y testeamos todo lo demás de forma real.
+// ── Mock de LandmarkService (capa MediaPipe — no disponible en Jest) ─────────
 
 jest.mock("../../services/landmark-service", () => ({
   LandmarkService: {
@@ -43,38 +38,76 @@ jest.mock("../../services/landmark-service", () => ({
 
 const mockExtractLandmarks = LandmarkService.extractLandmarks as jest.Mock;
 
-// ── Tests: checkHealth() ──────────────────────────────────────────────────────
+// ── Helper: crear un Response mock ──────────────────────────────────────────
+
+function mockResponse(
+  body: unknown,
+  status = 200
+): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? "OK" : "Error",
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  } as unknown as Response;
+}
+
+// ── Ciclo de vida del spy ────────────────────────────────────────────────────
+
+let fetchSpy: jest.SpyInstance;
+
+beforeEach(() => {
+  fetchSpy = jest.spyOn(global, "fetch");
+});
+
+afterEach(() => {
+  fetchSpy.mockRestore();
+  jest.clearAllMocks();
+});
+
+// ── Tests: checkHealth() ─────────────────────────────────────────────────────
 
 describe("TranslationService.checkHealth() ↔ GET /api/v1/health", () => {
   it("devuelve true cuando el backend responde 200", async () => {
+    fetchSpy.mockResolvedValueOnce(mockResponse({ status: "ok" }, 200));
+
     const result = await TranslationService.checkHealth();
     expect(result).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      getApiUrl(API_ENDPOINTS.HEALTH),
+      expect.objectContaining({ method: "GET" })
+    );
   });
 
   it("devuelve false cuando el backend responde 503", async () => {
-    server.use(handlerHealthDown);
+    fetchSpy.mockResolvedValueOnce(mockResponse({ status: "error" }, 503));
+
     const result = await TranslationService.checkHealth();
     expect(result).toBe(false);
   });
 
   it("devuelve false cuando hay un error de red (fetch rechaza)", async () => {
-    const { http, HttpResponse } = await import("msw");
-    const { getApiUrl, API_ENDPOINTS } =
-      await import("../../services/api-config");
-    server.use(
-      http.get(getApiUrl(API_ENDPOINTS.HEALTH), () => HttpResponse.error()),
-    );
+    fetchSpy.mockRejectedValueOnce(new Error("Network request failed"));
+
     const result = await TranslationService.checkHealth();
     expect(result).toBe(false);
   });
 });
 
-// ── Tests: predictStatic() ────────────────────────────────────────────────────
+// ── Tests: predictStatic() ───────────────────────────────────────────────────
 
 describe("TranslationService.predictStatic() ↔ POST /api/v1/predict/static", () => {
+  const successPayload: LetterPredictionResponse = {
+    letter: "A",
+    confidence: 92.5,
+    type: "static",
+  };
+
   it("devuelve la predicción cuando los landmarks son válidos (21 puntos)", async () => {
-    const landmarks = VALID_LANDMARKS as HandLandmarks;
-    const result = await TranslationService.predictStatic(landmarks);
+    fetchSpy.mockResolvedValueOnce(mockResponse(successPayload, 200));
+
+    const result = await TranslationService.predictStatic(VALID_LANDMARKS);
 
     expect(result).not.toBeNull();
     expect(result!.letter).toBe("A");
@@ -82,48 +115,58 @@ describe("TranslationService.predictStatic() ↔ POST /api/v1/predict/static", (
     expect(result!.type).toBe("static");
   });
 
-  it("lanza error cuando el backend devuelve 422 (landmarks inválidos)", async () => {
-    // Enviamos sólo 5 landmarks — el handler devuelve 422
-    const badLandmarks = Array.from({ length: 5 }, () => [
-      0, 0, 0,
-    ]) as HandLandmarks;
+  it("verifica que el body enviado contiene los landmarks", async () => {
+    fetchSpy.mockResolvedValueOnce(mockResponse(successPayload, 200));
 
-    await expect(
-      TranslationService.predictStatic(badLandmarks),
-    ).rejects.toThrow(/422/);
+    await TranslationService.predictStatic(VALID_LANDMARKS);
+
+    const [, fetchOptions] = fetchSpy.mock.calls[0];
+    const body = JSON.parse(fetchOptions.body as string);
+    expect(body.landmarks).toHaveLength(21);
+    expect(body.landmarks[0]).toHaveLength(3); // [x, y, z]
   });
 
   it("lanza error cuando el backend devuelve 503", async () => {
-    server.use(handlerServiceUnavailable);
-    const landmarks = VALID_LANDMARKS as HandLandmarks;
-
-    await expect(TranslationService.predictStatic(landmarks)).rejects.toThrow(
-      /503/,
+    fetchSpy.mockResolvedValueOnce(
+      mockResponse("Service Unavailable", 503)
     );
+
+    await expect(
+      TranslationService.predictStatic(VALID_LANDMARKS)
+    ).rejects.toThrow(/503/);
   });
 
   it("lanza error cuando el backend devuelve 500", async () => {
-    server.use(handlerInternalServerError);
-    const landmarks = VALID_LANDMARKS as HandLandmarks;
-
-    await expect(TranslationService.predictStatic(landmarks)).rejects.toThrow(
-      /500/,
+    fetchSpy.mockResolvedValueOnce(
+      mockResponse("Internal Server Error", 500)
     );
+
+    await expect(
+      TranslationService.predictStatic(VALID_LANDMARKS)
+    ).rejects.toThrow(/500/);
   });
 
   it("lanza error cuando hay un fallo de red (fetch rechaza)", async () => {
-    server.use(handlerNetworkError);
-    const landmarks = VALID_LANDMARKS as HandLandmarks;
+    fetchSpy.mockRejectedValueOnce(new Error("Network request failed"));
 
-    await expect(TranslationService.predictStatic(landmarks)).rejects.toThrow();
+    await expect(
+      TranslationService.predictStatic(VALID_LANDMARKS)
+    ).rejects.toThrow();
   });
 });
 
-// ── Tests: translateSign() — flujo completo ───────────────────────────────────
+// ── Tests: translateSign() — flujo completo ──────────────────────────────────
 
 describe("TranslationService.translateSign() — flujo completo front↔back", () => {
+  const backendResponse: LetterPredictionResponse = {
+    letter: "A",
+    confidence: 92.5,
+    type: "static",
+  };
+
   it("flujo exitoso: extrae landmarks → llama al backend → devuelve APIResponse", async () => {
     mockExtractLandmarks.mockResolvedValueOnce(VALID_LANDMARKS);
+    fetchSpy.mockResolvedValueOnce(mockResponse(backendResponse, 200));
 
     const result = await TranslationService.translateSign("file://test.jpg");
 
@@ -145,7 +188,7 @@ describe("TranslationService.translateSign() — flujo completo front↔back", (
 
   it("devuelve error descriptivo si el backend está caído (503)", async () => {
     mockExtractLandmarks.mockResolvedValueOnce(VALID_LANDMARKS);
-    server.use(handlerServiceUnavailable);
+    fetchSpy.mockResolvedValueOnce(mockResponse("Service Unavailable", 503));
 
     const result = await TranslationService.translateSign("file://test.jpg");
 
@@ -155,7 +198,9 @@ describe("TranslationService.translateSign() — flujo completo front↔back", (
 
   it("devuelve error descriptivo si el backend falla con 500", async () => {
     mockExtractLandmarks.mockResolvedValueOnce(VALID_LANDMARKS);
-    server.use(handlerInternalServerError);
+    fetchSpy.mockResolvedValueOnce(
+      mockResponse("Internal Server Error", 500)
+    );
 
     const result = await TranslationService.translateSign("file://test.jpg");
 
@@ -165,7 +210,7 @@ describe("TranslationService.translateSign() — flujo completo front↔back", (
 
   it("devuelve error de red si fetch falla completamente", async () => {
     mockExtractLandmarks.mockResolvedValueOnce(VALID_LANDMARKS);
-    server.use(handlerNetworkError);
+    fetchSpy.mockRejectedValueOnce(new Error("Network request failed"));
 
     const result = await TranslationService.translateSign("file://test.jpg");
 
